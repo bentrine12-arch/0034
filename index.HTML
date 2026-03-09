@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>MP3播放器</title>
+<style>
+body{
+  font-family:Arial;
+  background:linear-gradient(135deg,#dfe9ff,#f5f7ff);
+  text-align:center;
+  margin:0;
+}
+.container{
+  width:850px;
+  margin:auto;
+  background:white;
+  margin-top:30px;
+  padding:30px;
+  border-radius:12px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+h1{ color:#2c3e50; }
+.section{ margin-top:25px; }
+button{ padding:10px 18px; font-size:15px; margin:5px; cursor:pointer; }
+.slider{ width:320px; }
+canvas{ background:#111; border-radius:8px; margin-top:20px; }
+.info{ text-align:left; background:#f4f6ff; padding:18px; border-radius:8px; line-height:1.8; margin-top:20px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>MP3播放器：離散與連續控制對調示範</h1>
+
+<audio id="player"></audio>
+
+<div class="section">
+<h3>播放控制（滑桿）</h3>
+<p>滑動到最右邊開始播放，滑回左邊暫停</p>
+<input type="range" min="0" max="100" value="0" id="playSlider" class="slider">
+</div>
+
+<div class="section">
+<h3>切歌控制（連續滑桿）</h3>
+<p>滑動滑桿切換歌曲</p>
+<input type="range" min="0" max="2" step="0.01" value="0" id="songSlider" class="slider">
+<p id="songTitle"></p>
+</div>
+
+<div class="section">
+<h3>音量控制</h3>
+<button onclick="volumeDown()">音量 -</button>
+<button onclick="volumeUp()">音量 +</button>
+</div>
+
+<div class="section">
+<h3>播放進度控制</h3>
+<button onclick="back()">倒退10秒</button>
+<button onclick="forward()">快進10秒</button>
+</div>
+
+<div class="section">
+<h3>聲波視覺化</h3>
+<canvas id="visualizer" width="700" height="200"></canvas>
+</div>
+
+<div class="info">
+<b>MP3播放器使用說明</b><br>
+1. 滑動播放滑桿開始/暫停播放<br>
+2. 滑動切歌滑桿切換歌曲<br>
+3. 音量按鈕控制音量<br>
+4. 快進 / 倒退按鈕控制播放位置<br><br>
+<b>歌曲清單</b><br>
+0 = song1.mp3<br>
+1 = song2.mp3<br>
+2 = song3.mp3<br>
+</div>
+
+</div>
+
+<script>
+const player = document.getElementById("player");
+const playSlider = document.getElementById("playSlider");
+const songSlider = document.getElementById("songSlider");
+const songTitle = document.getElementById("songTitle");
+
+// 播放列表
+const playlist = [
+  {title:"Song 1", src:"song1.mp3"},
+  {title:"Song 2", src:"song2.mp3"},
+  {title:"Song 3", src:"song3.mp3"}
+];
+
+let currentSong = 0;
+player.src = playlist[currentSong].src;
+songTitle.textContent = playlist[currentSong].title;
+
+let audioContext=null, analyser=null, source=null;
+
+function initAudio(){
+  if(audioContext) return;
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioContext.createAnalyser();
+  source = audioContext.createMediaElementSource(player);
+  source.connect(analyser);
+  analyser.connect(audioContext.destination);
+  visualize();
+}
+
+// 播放滑桿
+playSlider.addEventListener("input",function(){
+  initAudio(); // 使用者互動時啟動 AudioContext
+  if(this.value>90) player.play();
+  if(this.value<10) player.pause();
+});
+
+// 切歌滑桿
+songSlider.addEventListener("input",function(){
+  initAudio();
+  const index = Math.round(this.value);
+  if(index !== currentSong){
+    currentSong = index;
+    player.src = playlist[currentSong].src;
+    songTitle.textContent = playlist[currentSong].title;
+    player.play();
+  }
+});
+
+// 音量
+function volumeUp(){ player.volume = Math.min(1, player.volume+0.1); }
+function volumeDown(){ player.volume = Math.max(0, player.volume-0.1); }
+
+// 進度控制
+function forward(){ player.currentTime += 10; }
+function back(){ player.currentTime -= 10; }
+
+// 視覺化
+function visualize(){
+  const canvas = document.getElementById("visualizer");
+  const ctx = canvas.getContext("2d");
+  analyser.fftSize = 256;
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  function draw(){
+    requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(dataArray);
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    let barWidth=(canvas.width/bufferLength)*2;
+    let x=0;
+    for(let i=0;i<bufferLength;i++){
+      let barHeight=dataArray[i];
+      ctx.fillStyle="rgb("+(barHeight+100)+",50,200)";
+      ctx.fillRect(x,canvas.height-barHeight/2,barWidth,barHeight/2);
+      x+=barWidth+1;
+    }
+  }
+  draw();
+}
+
+</script>
+</body>
+</html>
